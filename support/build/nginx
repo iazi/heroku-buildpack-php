@@ -24,21 +24,25 @@ echo "-----> Building ${dep_package}..."
 curl -L ${dep_url} | tar xz
 
 pushd ${dep_dirname}
+
+# patch a bunch of fallthrough cases with missing comments, which would error on GCC7
+curl -L https://github.com/nginx/nginx/commit/8449f750e62cd229026e9df3bd023ec7e073a7d4.patch | patch -p1
+
 ETC=${OUT_PREFIX}/etc
 VAR=${OUT_PREFIX}/var
 ./configure \
-    --prefix=${OUT_PREFIX} \
-    --conf-path=${ETC}/nginx/nginx.conf \
-    --pid-path=${VAR}/run/nginx.pid \
-    --lock-path=${VAR}/run/nginx.lock \
-    --http-client-body-temp-path=${VAR}/run/nginx/client_body_temp \
-    --http-proxy-temp-path=${VAR}/run/nginx/proxy_temp \
-    --http-fastcgi-temp-path=${VAR}/run/nginx/fastcgi_temp \
-    --http-uwsgi-temp-path=${VAR}/run/nginx/uwsgi_temp \
-    --http-scgi-temp-path=${VAR}/run/nginx/scgi_temp \
-    --http-log-path=${VAR}/log/nginx/access.log \
-    --error-log-path=${VAR}/log/nginx/error.log \
-    --with-http_realip_module
+	--prefix=${OUT_PREFIX} \
+	--conf-path=${ETC}/nginx/nginx.conf \
+	--pid-path=${VAR}/run/nginx.pid \
+	--lock-path=${VAR}/run/nginx.lock \
+	--http-client-body-temp-path=${VAR}/run/nginx/client_body_temp \
+	--http-proxy-temp-path=${VAR}/run/nginx/proxy_temp \
+	--http-fastcgi-temp-path=${VAR}/run/nginx/fastcgi_temp \
+	--http-uwsgi-temp-path=${VAR}/run/nginx/uwsgi_temp \
+	--http-scgi-temp-path=${VAR}/run/nginx/scgi_temp \
+	--http-log-path=${VAR}/log/nginx/access.log \
+	--error-log-path=${VAR}/log/nginx/error.log \
+	--with-http_realip_module
 make -s -j 9
 make install -s
 find ${OUT_PREFIX} -type f \( -executable -o -name '*.a' \) -exec sh -c "file -i '{}' | grep -Eq 'application/x-(archive|executable|sharedlib); charset=binary'" \; -print | xargs strip --strip-unneeded
@@ -59,11 +63,11 @@ cp $(dirname $BASH_SOURCE)/_conf/nginx/nginx.conf ${OUT_PREFIX}/etc/nginx/nginx.
 mkdir -p ${OUT_PREFIX}/bin
 # this gets sourced after package install, so that the buildpack and following buildpacks can invoke
 cat > ${OUT_PREFIX}/bin/export.nginx.sh <<'EOF'
-export PATH="/app/.heroku/php/bin:/app/.heroku/php/sbin:$PATH"
+export PATH="/app/.heroku/php/sbin:$PATH"
 EOF
 # this gets sourced on dyno boot
 cat > ${OUT_PREFIX}/bin/profile.nginx.sh <<'EOF'
-export PATH="$HOME/.heroku/php/bin:$HOME/.heroku/php/sbin:$PATH"
+export PATH="$HOME/.heroku/php/sbin:$PATH"
 EOF
 
 python $(dirname $BASH_SOURCE)/_util/include/manifest.py "heroku-sys-webserver" "heroku-sys/${dep_name}" "$dep_version" "${dep_formula}.tar.gz" "$MANIFEST_REQUIRE" "$MANIFEST_CONFLICT" "$MANIFEST_REPLACE" "$MANIFEST_PROVIDE" "$MANIFEST_EXTRA" > $dep_manifest
